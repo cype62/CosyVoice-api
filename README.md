@@ -1,93 +1,114 @@
-CosyVoice API 接口使用文档
-概述
-CosyVoice API 提供了多种语音合成功能，包括基于输入文本的多发音人 TTS、跨语言语音合成、零样本语音合成等功能。该 API 通过 FastAPI 框架构建，使用了 CosyVoice 模型，并提供跨域请求支持。
+## 安装依赖
 
-本 API 服务的默认端口为 50000，如需修改，请在启动服务时指定 --port 参数。
+确保安装了所有必需的 Python 包：
 
-基本设置
-API根路径： /
+```pip install fastapi uvicorn numpy```
+## 启动 FastAPI 服务器
 
-返回格式： 所有语音合成接口均返回 audio/wav 格式的语音文件流。
+在终端运行以下命令启动服务器：
 
-接口说明
-1. 语音合成（单发音人）- inference_sft
-描述：
-使用 CosyVoice 进行单发音人语音合成。传入文本和发音人 ID，生成对应语音。
+```python server.py --port <端口号> --model_dir <模型目录路径>```
+将 <端口号> 替换为你希望服务器监听的端口号。
+将 <模型目录路径> 替换为你预训练的 CosyVoice 模型的路径。
+### 示例：
 
-请求方式：
-GET /inference_sft
+```python server.py --port 50000 --model_dir ../../../pretrained_models/CosyVoice-300M```
+访问API
 
-请求参数：
-| 参数名 | 类型 | 说明 | | -------- | ------ | ------------------------- | | tts_text | Form | 合成语音的文本内容 | | spk_id | Form | 发音人 ID |
+服务器启动后，API 可通过 http://localhost:<端口号> 进行访问。
 
-响应：
-返回生成的 audio/wav 文件。
+## API接口
+### 1. /inference_sft
+请求方法: GET
+描述: 使用 Speaker Fine-Tuning（SFT）方法进行语音合成。
+请求参数:
 
-示例请求：
+tts_text (表单数据, 必填): 要合成的文本。
+spk_id (表单数据, 必填): 说话人的 ID。
+响应: 返回一个 WAV 音频流（采样率为 22050 Hz）。
+
+请求示例:
+
+```curl -X GET "http://localhost:<端口号>/inference_sft" -F "tts_text=你好，世界" -F "spk_id=spk_001"```
+### 2. /inference_zero_shot
+请求方法: GET
+描述: 进行零样本语音合成。
+请求参数:
+
+tts_text (表单数据, 必填): 要合成的文本。
+prompt_text (表单数据, 必填): 提供的提示文本。
+prompt_wav (表单数据, 必填): 提供的 WAV 音频文件（UploadFile 格式上传）。
+响应: 返回一个 WAV 音频流（采样率为 22050 Hz）。
+
+请求示例:
+
+```
+curl -X GET "http://localhost:<端口号>/inference_zero_shot" \
+-F "tts_text=你好" \
+-F "prompt_text=这是一个提示文本" \
+-F "prompt_wav=@文件路径.wav"
+```
+### 3. /inference_cross_lingual
+请求方法: GET
+描述: 使用提示音频文件进行跨语言语音合成。
+请求参数:
+
+tts_text (表单数据, 必填): 要合成的文本。
+prompt_wav (表单数据, 必填): 提供的 WAV 音频文件（UploadFile 格式上传）。
+响应: 返回一个 WAV 音频流（采样率为 22050 Hz）。
+
+请求示例:
+
+```
+curl -X GET "http://localhost:<端口号>/inference_cross_lingual" \
+-F "tts_text=你好" \
+-F "prompt_wav=@文件路径.wav"
+```
+### 4. /inference_instruct
+请求方法: GET
+描述: 提供指令文本进行语音合成。
+请求参数:
+
+tts_text (表单数据, 必填): 要合成的文本。
+spk_id (表单数据, 必填): 说话人的 ID。
+instruct_text (表单数据, 必填): 模型需要遵循的指令文本。
+响应: 返回一个 WAV 音频流（采样率为 22050 Hz）。
+
+请求示例:
+
+```
+curl -X GET "http://localhost:<端口号>/inference_instruct" \
+-F "tts_text=请按照指令说话" \
+-F "spk_id=spk_002" \
+-F "instruct_text=用平静的语调说"
+```
+示例用法
+/inference_sft 的 cURL 示例：
+
+```
 curl -X GET "http://localhost:50000/inference_sft" \
 -F "tts_text=你好，世界" \
--F "spk_id=001"
-2. 零样本语音合成 - inference_zero_shot
-描述：
-基于文本、提示语音文件（prompt_wav）以及提示文本，进行零样本语音合成。
+-F "spk_id=spk_001"
+```
+此请求将发送文本 "你好，世界" 并使用说话人 ID spk_001 进行合成，返回一个 WAV 文件。
 
-请求方式：
-GET /inference_zero_shot
+/inference_zero_shot 的 Python 示例：
+```
+import requests
 
-请求参数：
-| 参数名 | 类型 | 说明 | | ----------- | ---------- | ----------------------------- | | tts_text | Form | 合成语音的文本内容 | | prompt_text | Form | 提示文本（用于指导语音风格） | | prompt_wav | File | 提示语音文件，用于模仿该语音的发音风格 |
+url = "http://localhost:50000/inference_zero_shot"
+files = {'prompt_wav': open('path_to_wav_file.wav', 'rb')}
+data = {
+    'tts_text': '你好',
+    'prompt_text': '示例提示'
+}
 
-响应：
-返回生成的 audio/wav 文件。
-
-示例请求：
-curl -X GET "http://localhost:50000/inference_zero_shot" \
--F "tts_text=你好，世界" \
--F "prompt_text=你好" \
--F "prompt_wav=@path_to_prompt_wav.wav"
-3. 跨语言语音合成 - inference_cross_lingual
-描述：
-基于输入文本与提示语音文件，生成跨语言的合成语音。
-
-请求方式：
-GET /inference_cross_lingual
-
-请求参数：
-| 参数名 | 类型 | 说明 | | --------- | -------- | ------------------------- | | tts_text | Form | 合成语音的文本内容 | | prompt_wav | File | 提示语音文件（语音样本） |
-
-响应：
-返回生成的 audio/wav 文件。
-
-示例请求：
-curl -X GET "http://localhost:50000/inference_cross_lingual" \
--F "tts_text=你好，世界" \
--F "prompt_wav=@path_to_prompt_wav.wav"
-4. 指令引导语音合成 - inference_instruct
-描述：
-基于输入的文本、发音人 ID 及指令文本生成合成语音，指令文本用于引导语音风格。
-
-请求方式：
-GET /inference_instruct
-
-请求参数：
-| 参数名 | 类型 | 说明 | | ------------ | ------- | ----------------------------- | | tts_text | Form | 合成语音的文本内容 | | spk_id | Form | 发音人 ID | | instruct_text | Form | 指令文本（用于指导语音风格） |
-
-响应：
-返回生成的 audio/wav 文件。
-
-示例请求：
-curl -X GET "http://localhost:50000/inference_instruct" \
--F "tts_text=你好，世界" \
--F "spk_id=001" \
--F "instruct_text=以温柔的语气说出"
-启动服务
-可以通过命令行运行以下命令来启动服务：
-
-python server.py --port 50000 --model_dir ../../../pretrained_models/CosyVoice-300M
---port：设置服务器端口号，默认为 50000。
---model_dir：设置模型文件路径，默认路径为 ../../../pretrained_models/CosyVoice-300M。
+response = requests.get(url, data=data, files=files)
+with open('output.wav', 'wb') as f:
+    f.write(response.content)
+```
 注意事项
-所有语音合成接口都返回 audio/wav 文件流。
-请确保上传的音频文件为 .wav 格式，采样率为 16kHz，以确保模型处理的正确性。
-CORS 跨域请求已允许。
-如有问题，请参考 CosyVoice 项目的文档或联系开发团队。
+音频输出: 输出音频为 WAV 格式，采样率为 22050 Hz。
+错误处理: 请确保输入的 WAV 文件格式正确，并且采样率为 22050 Hz。
+自定义模型目录: 启动服务器时，可以通过 --model_dir 参数指定模型目录。
+该服务器使用 FastAPI 的 StreamingResponse 返回 WAV 音频数据，确保生成的语音文件能够被高效地返回和播放。
