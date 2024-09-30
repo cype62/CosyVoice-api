@@ -1,114 +1,101 @@
-## 安装依赖
+# 使用文档：cosyvoice-api.py
+## 1. 简介
+server_wav.py 是一个使用 Flask 构建的文本到语音（TTS）服务。该服务支持通过文本生成音频文件，并可以选择流式或非流式输出模式。该服务还允许用户根据不同的角色和语速生成语音。
 
-确保安装了所有必需的 Python 包：
+注意：只提供了预训练的音色接口，支持参数：文案、角色、速度
 
-```pip install fastapi uvicorn numpy```
-## 启动 FastAPI 服务器
-
-在终端运行以下命令启动服务器：
-
-```python server.py --port <端口号> --model_dir <模型目录路径>```
-将 <端口号> 替换为你希望服务器监听的端口号。
-将 <模型目录路径> 替换为你预训练的 CosyVoice 模型的路径。
-### 示例：
-
-```python server.py --port 50000 --model_dir ../../../pretrained_models/CosyVoice-300M```
-访问API
-
-服务器启动后，API 可通过 http://localhost:<端口号> 进行访问。
-
-## API接口
-### 1. /inference_sft
-请求方法: GET
-描述: 使用 Speaker Fine-Tuning（SFT）方法进行语音合成。
-请求参数:
-
-tts_text (表单数据, 必填): 要合成的文本。
-spk_id (表单数据, 必填): 说话人的 ID。
-响应: 返回一个 WAV 音频流（采样率为 22050 Hz）。
-
-请求示例:
-
-```curl -X GET "http://localhost:<端口号>/inference_sft" -F "tts_text=你好，世界" -F "spk_id=spk_001"```
-### 2. /inference_zero_shot
-请求方法: GET
-描述: 进行零样本语音合成。
-请求参数:
-
-tts_text (表单数据, 必填): 要合成的文本。
-prompt_text (表单数据, 必填): 提供的提示文本。
-prompt_wav (表单数据, 必填): 提供的 WAV 音频文件（UploadFile 格式上传）。
-响应: 返回一个 WAV 音频流（采样率为 22050 Hz）。
-
-请求示例:
-
+## 2. 环境要求
+Python 3.6 及以上
+已安装以下 Python 库：
 ```
-curl -X GET "http://localhost:<端口号>/inference_zero_shot" \
--F "tts_text=你好" \
--F "prompt_text=这是一个提示文本" \
--F "prompt_wav=@文件路径.wav"
+Flask
+torch
+torchaudio
+ffmpeg-python
+flask_cors
+cosyvoice
 ```
-### 3. /inference_cross_lingual
-请求方法: GET
-描述: 使用提示音频文件进行跨语言语音合成。
-请求参数:
-
-tts_text (表单数据, 必填): 要合成的文本。
-prompt_wav (表单数据, 必填): 提供的 WAV 音频文件（UploadFile 格式上传）。
-响应: 返回一个 WAV 音频流（采样率为 22050 Hz）。
-
-请求示例:
-
+您可以通过以下命令安装所需依赖项（假设您已经安装了 pip）：
 ```
-curl -X GET "http://localhost:<端口号>/inference_cross_lingual" \
--F "tts_text=你好" \
--F "prompt_wav=@文件路径.wav"
+pip install flask torch torchaudio ffmpeg-python flask-cors cosyvoice
 ```
-### 4. /inference_instruct
-请求方法: GET
-描述: 提供指令文本进行语音合成。
-请求参数:
+## 3. 配置
+在运行服务器之前，请确保您已经下载了所需的 TTS 模型，并指定模型路径。您可以通过命令行参数设置模型的路径。
 
-tts_text (表单数据, 必填): 要合成的文本。
-spk_id (表单数据, 必填): 说话人的 ID。
-instruct_text (表单数据, 必填): 模型需要遵循的指令文本。
-响应: 返回一个 WAV 音频流（采样率为 22050 Hz）。
-
-请求示例:
-
+## 4. 运行服务
+要启动 Flask 服务器，请在终端中运行以下命令：
 ```
-curl -X GET "http://localhost:<端口号>/inference_instruct" \
--F "tts_text=请按照指令说话" \
--F "spk_id=spk_002" \
--F "instruct_text=用平静的语调说"
+python server_wav.py --port 50000 --model_dir <YOUR_MODEL_PATH>
 ```
-示例用法
-/inference_sft 的 cURL 示例：
+其中 --port 参数用于设置端口号，--model_dir 是您模型文件的路径。
 
-```
-curl -X GET "http://localhost:50000/inference_sft" \
--F "tts_text=你好，世界" \
--F "spk_id=spk_001"
-```
-此请求将发送文本 "你好，世界" 并使用说话人 ID spk_001 进行合成，返回一个 WAV 文件。
+## 5. 接口说明
+### 5.1 / - POST 方法
+该接口接收 JSON 数据并返回生成的音频。
 
-/inference_zero_shot 的 Python 示例：
+请求示例：
 ```
-import requests
-
-url = "http://localhost:50000/inference_zero_shot"
-files = {'prompt_wav': open('path_to_wav_file.wav', 'rb')}
-data = {
-    'tts_text': '你好',
-    'prompt_text': '示例提示'
+{
+    "text": "你好，这是一个测试语音。",
+    "speaker": "speaker_name",
+    "streaming": 0
 }
-
-response = requests.get(url, data=data, files=files)
-with open('output.wav', 'wb') as f:
-    f.write(response.content)
 ```
-注意事项
-音频输出: 输出音频为 WAV 格式，采样率为 22050 Hz。
-错误处理: 请确保输入的 WAV 文件格式正确，并且采样率为 22050 Hz。
-自定义模型目录: 启动服务器时，可以通过 --model_dir 参数指定模型目录。
-该服务器使用 FastAPI 的 StreamingResponse 返回 WAV 音频数据，确保生成的语音文件能够被高效地返回和播放。
+响应：
+
+如果成功，返回音频文件，内容类型为 audio/wav 或 audio/ogg（根据 streaming 参数）。
+错误请求将返回相应的错误消息。
+### 5.2 /tts_to_audio/ - POST 方法
+此接口用于将文本、角色和速度转换为音频文件。
+请求示例：
+```
+POST /tts_to_audio/
+```
+
+参数：
+```
+{
+    "text": "欢迎使用语音合成服务。",
+    "speaker": "speaker_name",
+    "speed": 1.0
+}
+```
+响应：
+
+返回生成的音频文件，内容类型为 audio/wav。
+错误请求将返回相应的错误消息。
+### 5.3 /speakers - GET 方法
+此接口返回可用的角色列表。
+
+请求示例：
+
+```
+GET /speakers
+```
+响应：
+```
+{
+    "available_speakers": ["speaker1", "speaker2", "..."]
+}
+```
+### 5.4 / - GET 方法
+此接口与 POST 方法类似，但接受 query parameters 作为输入。
+
+请求示例：
+
+```
+GET /?text=你好&speaker=speaker_name&streaming=0
+```
+响应：
+返回生成的音频文件，内容类型基于 streaming 参数。
+错误请求将返回相应的错误消息。
+## 6. 注意事项
+确保输入文本和角色不为空。
+音频生成可能会消耗一定的时间，尤其是在处理长文本时。
+服务器默认绑定到 0.0.0.0，这意味着它将在所有可用IP上监听请求。
+## 7. 示例请求
+使用 curl 可模拟 POST 请求：
+
+```
+curl -X POST http://localhost:50000/ -H "Content-Type: application/json" -d '{"text":"你好","speaker":"speaker_name","streaming":0}'
+```
